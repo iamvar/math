@@ -1,4 +1,4 @@
-# BcParser
+# Math
 
 Every developer knows: float is not the best choice for precise calculation.
 
@@ -17,7 +17,7 @@ Yes, but calculating small expression, like `($a + $b * $c - $d) / $e` becomes a
 $result = bcdiv(bcsub(bcadd($a, bcmul($b, $c)), $d), $e);
 ```
 
-That is where BcParser tool becomes useful:
+That is where this tool becomes useful:
 
 With registered helpers functions, you can just use
 
@@ -43,7 +43,7 @@ To register global helper functions, just update your composer.json with
 ```
 "autoload": {
     "files": [
-        "vendor/iamvar/bcparser/src/helpers.php"
+        "vendor/iamvar/math/src/helpers.php"
     ]
 },
 ```
@@ -69,4 +69,4 @@ If you want to save scale, add second parameter as false
 
 ## License
 
-BcParser is licensed under the [MIT License](LICENSE).
+Math is licensed under the [MIT License](LICENSE).
