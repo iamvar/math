@@ -34,6 +34,8 @@ All calculations behind the scene use bcmath functions.
 ```bash
 php > var_dump(calc("1.2 * 3"));
 string("3.6")
+
+php > isTrue('1 < 2 < 3'); // true
 ```
 
 ## Helper Functions
@@ -46,6 +48,24 @@ To register global helper functions, just update your composer.json with
         "vendor/iamvar/math/src/helpers.php"
     ]
 },
+```
+
+## Examples
+
+```php
+<?php
+
+$a = 0.1E1;
+$b = 2e-7;
+$c = 2;
+calc("$a + $b * $c"); // 1.0000004
+calc("1.69 ^ (1/2) + (0.1 - 0.25) * 2"); // 1
+
+isTrue("(1 + 0.2) * 3 == 3.6 + (1-9) * 0"); // true
+isTrue('1 < 2 < 3'); // true
+isTrue('1 < 2 > 3'); // false
+
+
 ```
 
 ## bcscale
