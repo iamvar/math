@@ -2,10 +2,9 @@
 
 use Iamvar\Math;
 
-test('calc', function (string $expression, string $result) {
-    expect((new Math())->calc($expression))->toBe($result);
+test('calc', function (string $expression, string $expected) {
+    expect((new Math())->calc($expression))->toBe($expected);
 })->with([
-    'plain number' => ['1', '1'],
     'negative number' => ['-1.5', '-1.5'],
     'cut zeroes' => ['1.0000', '1'],
     'do not cut useful zeroes' => ['10.0', '10'],
@@ -31,7 +30,17 @@ test('calc', function (string $expression, string $result) {
     ['16 ^ 20.5', '4835703278458516698824704'],
     ['65536^0.0625', '2'],
     ['18446744073709551616^0.015625', '2'],
-    ...array_map(static fn(string $n) => [$n, $n], range('1', '9'))
+    ['2^2*2', '8'],
+    ['2 * 2^2', '8'],
+    ['1 - -1', '2'],
+    ['2 ^ 4 % 3 ^ 2', '7'],
+    ['-1 - -1', '0'],
+    ['--1 - -1', '2'],
+    ['-0', '0'],
+    ['-0.0', '0'],
+    ['2^-2', '0.25'],
+    ['2^(--2)', '4'],
+    ...array_map(static fn(string $n) => [$n, $n], range('0', '9'))
 ]);
 
 test('calc Error', function (string $expression) {
@@ -90,6 +99,7 @@ test('isTrue Error', function (string $expression) {
         'extra brace' => '(1 < 2))',
         'unclosed brace' => '( (1 < 2)',
         'number with comma' => '1,1 < 2',
+        'space between less then' => '1 < = 2',
         'letters' => '$a < 1',
         'exclamation' => '1!',
         'no right number' => '1<',

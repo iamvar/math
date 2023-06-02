@@ -21,37 +21,46 @@ class Math
     }
 
     /**
-     * Calculates expression with bcmath extension,
+     * Calculates expression, using bcmath extension,
      * e.g. "1 + 1.2 * 3" will return "4.6"
      */
     public function calc(string $expression, bool $cutTrailingZeroes = true): string
     {
-        $expression = $this->prepare($expression);
+        // remove all whitespaces
+        $expression = preg_replace('~\s+~', '', $expression);
+        $expression = $this->replaceFloat($expression);
 
         while (preg_match('~\(.*\)~', $expression)) {
             $expression = preg_replace_callback(
                 '~\(([^()]+)\)~',
-                fn(array $matches) => $this->calcExpressionWithoutBraces($matches[1]),
+                fn(array $matches) => $this->calcExpressionInBraces($matches[1]),
                 $expression
             );
         }
 
-        $result = $this->calcExpressionWithoutBraces($expression);
+        $result = $this->calcExpressionInBraces($expression);
 
         $this->checkIsNumber($result);
 
         if ($cutTrailingZeroes) {
-            return $this->trimTrailingZeroes($result);
+            $result = $this->trimTrailingZeroes($result);
+        }
+
+        if (bccomp($result, '0', $this->scale) === 0) {
+            return '0';
         }
 
         return $result;
     }
 
-    private function calcExpressionWithoutBraces(string $expression): string
+    private function calcExpressionInBraces(string $expression): string
     {
-        // first multiply, divide, power, mod. Then add, subtract
+        if (str_starts_with($expression, '--')) {
+            $expression = substr($expression, 2);
+        }
+        // first power, mod, multiply, divide. Then add, subtract
         $numberRegex = self::NUMBER_REGEXP;
-        foreach (["[*/^%]", "[+-]"] as $operations) {
+        foreach (["\^", "%", "[*/]", "[+-]"] as $operations) {
             $regexp = "~($numberRegex)($operations)($numberRegex)~";
             while (preg_match($regexp, $expression, $m)) {
                 $expression = preg_replace_callback(
@@ -73,7 +82,7 @@ class Math
      */
     public function isTrue(string $expression): bool
     {
-        $expression = $this->prepare($expression);
+        $expression = $this->replaceFloat($expression);
 
         $matches = preg_split('~(>=|<=|<|>|={1,3})~', $expression, -1, PREG_SPLIT_DELIM_CAPTURE);
 
@@ -108,8 +117,8 @@ class Math
 
     private function bcOperation(array $matches): string
     {
-        [$left, $right] = [$matches[1], $matches[3]];
-        return match ($matches[2]) {
+        [$left, $operator, $right] = [$matches[1], $matches[2], $matches[3]];
+        return match ($operator) {
             '*' => bcmul($left, $right, $this->scale),
             '/' => bcdiv($left, $right, $this->scale),
             '%' => bcmod($left, $right, $this->scale),
@@ -119,16 +128,9 @@ class Math
         };
     }
 
-    private function prepare(string $expression): string
-    {
-        // remove all whitespaces
-        $expression = preg_replace('~\s+~', '', $expression);
-
-        return $this->replaceFloat($expression);
-    }
-
     /**
-     * replace float numbers, like 2.1E-1 with 0.21
+     * Replaces float numbers in the expression
+     * e.g. 2.1E-1 will be replaced with 0.21
      */
     private function replaceFloat(string $expression): string
     {
