@@ -75,24 +75,28 @@ class Math
     {
         $expression = $this->prepare($expression);
 
-        $matches = preg_split('~(<|>|={1,3})~', $expression, -1, PREG_SPLIT_DELIM_CAPTURE);
+        $matches = preg_split('~(>=|<=|<|>|={1,3})~', $expression, -1, PREG_SPLIT_DELIM_CAPTURE);
 
         if (!isset($matches[2])) { //check we have right operand
-            throw new \ValueError('Bad expression');
+            throw new \ValueError('Unsupported expression');
         }
 
         $i = 1;
         while (isset($matches[$i])) {
             [$left, $operator, $right] = [$matches[$i - 1], $matches[$i], $matches[$i + 1]];
-            $compare = match ($operator) {
-                '>' => 1,
-                '<' => -1,
-                '=', '==', '===' => 0,
-            };
-
             $left = $this->calc($left);
             $right = $this->calc($right);
-            if (bccomp($left, $right, $this->scale) !== $compare) {
+
+            $bccomp = bccomp($left, $right, $this->scale);
+            $passCompare = match ($operator) {
+                '>=' => $bccomp >= 0,
+                '<=' => $bccomp <= 0,
+                '>' => $bccomp === 1,
+                '<' => $bccomp === -1,
+                '=', '==', '===' => $bccomp === 0,
+            };
+
+            if (!$passCompare) {
                 return false;
             }
 
@@ -120,7 +124,14 @@ class Math
         // remove all whitespaces
         $expression = preg_replace('~\s+~', '', $expression);
 
-        //replace float numbers, like 2.1E-1 with 0.21
+        return $this->replaceFloat($expression);
+    }
+
+    /**
+     * replace float numbers, like 2.1E-1 with 0.21
+     */
+    private function replaceFloat(string $expression): string
+    {
         return preg_replace_callback(
             '~\d+(?:\.\d+)?E[-+]?\d+~',
             function (array $matches) {
@@ -140,7 +151,7 @@ class Math
     {
         $numberRegExp = self::NUMBER_REGEXP;
         if (!preg_match("~^$numberRegExp$~", $subject)) {
-            throw new \ValueError('Bad expression');
+            throw new \ValueError('Unsupported expression');
         }
     }
 
@@ -154,13 +165,17 @@ class Math
             return '0';
         }
 
-        $exponent = $this->trimTrailingZeroes($exponent);
+        [$integerPart, $fractionalPart] = explode('.', "$exponent.0");
+        $result = bcpow($number, $integerPart, $this->scale);
 
-        if (ctype_digit($exponent)) {
-            return bcpow($number, $exponent, $this->scale);
+        if ($fractionalPart !== '0') {
+            $exponent = $this->trimTrailingZeroes('0.' . $fractionalPart);
+            $float = (float)$number ** (float)$exponent;
+            $minorPart = $this->replaceFloat((string)($float));
+            $result = bcmul($result, $minorPart, $this->scale);
         }
 
-        return (string)((float)$number ** (float)$exponent);
+        return $result;
     }
 
     private function trimTrailingZeroes(string $number): string
