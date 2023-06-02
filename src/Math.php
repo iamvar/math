@@ -29,6 +29,7 @@ class Math
         // remove all whitespaces
         $expression = preg_replace('~\s+~', '', $expression);
         $expression = $this->replaceFloat($expression);
+        $expression = $this->replaceFunctions($expression);
 
         while (preg_match('~\(.*\)~', $expression)) {
             $expression = preg_replace_callback(
@@ -50,6 +51,11 @@ class Math
             return '0';
         }
 
+        //remove useless leading zeroes, e.g. 09.1 will become 9.1
+        if (!str_starts_with($result, '0.')) {
+            $result = ltrim($result, '0');
+        }
+
         return $result;
     }
 
@@ -62,7 +68,7 @@ class Math
         $numberRegex = self::NUMBER_REGEXP;
         foreach (["\^", "%", "[*/]", "[+-]"] as $operations) {
             $regexp = "~($numberRegex)($operations)($numberRegex)~";
-            while (preg_match($regexp, $expression, $m)) {
+            while (preg_match($regexp, $expression)) {
                 $expression = preg_replace_callback(
                     $regexp,
                     [$this, 'bcOperation'],
@@ -82,8 +88,6 @@ class Math
      */
     public function isTrue(string $expression): bool
     {
-        $expression = $this->replaceFloat($expression);
-
         $matches = preg_split('~(>=|<=|<|>|={1,3})~', $expression, -1, PREG_SPLIT_DELIM_CAPTURE);
 
         if (!isset($matches[2])) { //check we have right operand
@@ -187,5 +191,30 @@ class Math
         }
 
         return $number;
+    }
+
+    private function replaceFunctions(string $expression): string
+    {
+        while (preg_match('~(abs|min|max)(?<R>\((?:[^()]+|(?&R))*\))~', $expression, $matches)) {
+            [$operation, $matchedExpression] = [$matches[1], $matches[2]];
+            $matchedExpression = substr($matchedExpression, 1, -1);
+
+            if ($operation === 'abs') {
+                $replace = ltrim($this->calc($matchedExpression), '-');
+                $expression = str_replace($matches[0], $replace, $expression);
+                continue;
+            }
+
+            $expressionParts = explode(',', $matchedExpression);
+            $expressionParts = array_map([$this, 'calc'], $expressionParts);
+            $replace = match ($operation) {
+                'min' => min($expressionParts),
+                'max' => max($expressionParts),
+            };
+
+            $expression = str_replace($matches[0], $replace, $expression);
+        }
+
+        return $expression;
     }
 }

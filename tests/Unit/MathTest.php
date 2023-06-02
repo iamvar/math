@@ -9,6 +9,7 @@ test('calc', function (string $expression, string $expected) {
     'cut zeroes' => ['1.0000', '1'],
     'do not cut useful zeroes' => ['10.0', '10'],
     'do not cut zeroes when no decimal' => ['10', '10'],
+    'remove leading zeroes' => ['010', '10'],
     'add' => ['1+2', '3'],
     'add decimal' => ['1.0000000001 + 2.1', '3.1000000001'],
     'complex expression' => ['(1.0000000001 + 2.1) * 3 - 2^(1+4/2)', '1.3000000003'],
@@ -40,6 +41,13 @@ test('calc', function (string $expression, string $expected) {
     ['-0.0', '0'],
     ['2^-2', '0.25'],
     ['2^(--2)', '4'],
+    ['abs(-2)', '2'],
+    ['abs(2)', '2'],
+    ['abs(2 - 4)', '2'],
+    ['abs(2 - (3+1))', '2'],
+    ['min(2, (3+1))', '2'],
+    ['max(2, (3+1))', '4'],
+    ['min(090.2, 10)', '10'],
     ...array_map(static fn(string $n) => [$n, $n], range('0', '9'))
 ]);
 
@@ -53,6 +61,7 @@ test('calc Error', function (string $expression) {
         'number with comma' => '1,1 + 2',
         'letters' => '$a + 1',
         'exclamation' => '1!',
+        'abs with extra braces' => 'abs(2 - (3+1)',
         ...range('a', 'z')
     ]);
 
@@ -74,7 +83,9 @@ test('isTrue true-expressions', function (string $expression) {
     'expressions' => '1.2 * 3 == 3.6 + 0',
     'expressions with braces' => '(1 + 0.2) * 3 == 3.6 + (1-9) * 0',
     'mix of comparisons' => '1 == 2 - 1 < 2',
-    '5/6' => '1/2 + 1/3 = 1*3/2*3 + 1*2/3*2 = 3/6 + 2/6 = 5/6'
+    '5/6' => '1/2 + 1/3 = 1*3/2*3 + 1*2/3*2 = 3/6 + 2/6 = 5/6',
+    'abs(-1) > 0',
+    'min(5,abs(-9)) = max(3, 4, 5)',
 ]);
 
 test('isTrue false-expressions', function (string $expression) {
