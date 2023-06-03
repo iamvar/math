@@ -22,22 +22,27 @@ class Math
 
     /**
      * Calculates expression, using bcmath extension,
-     * e.g. "1 + 1.2 * 3" will return "4.6"
+     * e.g. "1.1 + 1.2 * 3" will return "4.7"
      */
     public function calc(string $expression, bool $cutTrailingZeroes = true): string
     {
         // remove all whitespaces
         $expression = preg_replace('~\s+~', '', $expression);
         $expression = $this->replaceFloat($expression);
-        $expression = $this->replaceFunctions($expression);
+        $this->validate($expression);
 
-        while (preg_match('~\(.*\)~', $expression)) {
+        //No operator before brace - multiply, e.g. 2(1+1) = 2*(1+1) or (1+1)(1+1) = (1+1)*(1+1)
+        $expression = preg_replace('~(\d|\))\(~', '$1*(', $expression);
+
+        while (preg_match('~(?<!min|max|abs)\(.+\)~', $expression)) {
             $expression = preg_replace_callback(
-                '~\(([^()]+)\)~',
+                '~(?<!min|max|abs)\(([^()]+)\)~',
                 fn(array $matches) => $this->calcExpressionInBraces($matches[1]),
                 $expression
             );
         }
+
+        $expression = $this->replaceFunctions($expression);
 
         $result = $this->calcExpressionInBraces($expression);
 
@@ -52,8 +57,9 @@ class Math
         }
 
         //remove useless leading zeroes, e.g. 09.1 will become 9.1
-        if (!str_starts_with($result, '0.')) {
-            $result = ltrim($result, '0');
+        $result = ltrim($result, '0');
+        if (str_starts_with($result, '.')) {
+            $result = '0' . $result;
         }
 
         return $result;
@@ -90,13 +96,18 @@ class Math
     {
         $matches = preg_split('~(>=|<=|<|>|={1,3})~', $expression, -1, PREG_SPLIT_DELIM_CAPTURE);
 
-        if (!isset($matches[2])) { //check we have right operand
-            throw new \ValueError('Unsupported expression');
+        if (!isset($matches[2])) {
+            throw new \ValueError('Condition expression is missing');
         }
 
         $i = 1;
         while (isset($matches[$i])) {
-            [$left, $operator, $right] = [$matches[$i - 1], $matches[$i], $matches[$i + 1]];
+            [$left, $operator, $right] = [$matches[$i - 1], $matches[$i], $matches[$i + 1] ?? null];
+
+            if (!($right)) {
+                throw new \ValueError("Condition after '$operator' is missing");
+            }
+
             $left = $this->calc($left);
             $right = $this->calc($right);
 
@@ -216,5 +227,12 @@ class Math
         }
 
         return $expression;
+    }
+
+    private function validate(string $expression): void
+    {
+        if (substr_count($expression, '(') !== substr_count($expression, ')')) {
+            throw new \ValueError('Uneven Braces');
+        }
     }
 }

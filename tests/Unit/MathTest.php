@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Iamvar\Math;
 
 test('calc', function (string $expression, string $expected) {
@@ -10,6 +12,7 @@ test('calc', function (string $expression, string $expected) {
     'do not cut useful zeroes' => ['10.0', '10'],
     'do not cut zeroes when no decimal' => ['10', '10'],
     'remove leading zeroes' => ['010', '10'],
+    'remove leading zeroes with .' => ['00.10', '0.1'],
     'add' => ['1+2', '3'],
     'add decimal' => ['1.0000000001 + 2.1', '3.1000000001'],
     'complex expression' => ['(1.0000000001 + 2.1) * 3 - 2^(1+4/2)', '1.3000000003'],
@@ -48,21 +51,34 @@ test('calc', function (string $expression, string $expected) {
     ['min(2, (3+1))', '2'],
     ['max(2, (3+1))', '4'],
     ['min(090.2, 10)', '10'],
-    ...array_map(static fn(string $n) => [$n, $n], range('0', '9'))
+    ['min(1+1, 3)+1', '3'],
+    'no math operator before braces' => ['4(1+2)', '12'],
+    ...array_map(
+        static fn(string $n) => [$n, $n],
+        array_map('strval', range('0', '9'))
+    )
 ]);
 
 test('calc Error', function (string $expression) {
     (new Math())->calc($expression);
 })->throws(ValueError::class, 'Unsupported expression')
     ->with([
-        'only one brace' => '(1 + 2',
-        'extra brace' => '(1 + 2))',
-        'unclosed brace' => '( (1 + 2)',
         'number with comma' => '1,1 + 2',
         'letters' => '$a + 1',
         'exclamation' => '1!',
+        'empty braces' => '()',
+        'min()',
+        ...range('A', 'z')
+    ]);
+
+test('calc Braces Error', function (string $expression) {
+    (new Math())->calc($expression);
+})->throws(ValueError::class, 'Uneven Braces')
+    ->with([
+        'only one brace' => '(1 + 2',
+        'extra brace' => '(1 + 2))',
+        'unclosed brace' => '( (1 + 2)',
         'abs with extra braces' => 'abs(2 - (3+1)',
-        ...range('a', 'z')
     ]);
 
 test('isTrue true-expressions', function (string $expression) {
@@ -106,15 +122,40 @@ test('isTrue Error', function (string $expression) {
     (new Math())->isTrue($expression);
 })->throws(ValueError::class, 'Unsupported expression')
     ->with([
-        'only one brace' => '(1 < 2',
-        'extra brace' => '(1 < 2))',
-        'unclosed brace' => '( (1 < 2)',
         'number with comma' => '1,1 < 2',
         'space between less then' => '1 < = 2',
         'letters' => '$a < 1',
-        'exclamation' => '1!',
-        'no right number' => '1<',
+    ]);
+
+test('isTrue Braces Error', function (string $expression) {
+    (new Math())->isTrue($expression);
+})->throws(ValueError::class, 'Uneven Braces')
+    ->with([
+        'only one brace' => '(1 < 2',
+        'extra brace' => '(1 < 2))',
+        'unclosed brace' => '( (1 < 2)',
+    ]);
+
+test('isTrue Missing Right Expression After == Error', function (string $expression) {
+    (new Math())->isTrue($expression);
+})->throws(ValueError::class, "Condition after '==' is missing")
+    ->with([
         'no right number equal' => '1 ==',
+    ]);
+
+test('isTrue Missing Right Expression Error', function (string $expression) {
+    (new Math())->isTrue($expression);
+})->throws(ValueError::class, "Condition after '<' is missing")
+    ->with([
+        'no right number' => '1<',
         'no right number - several comparisons' => '1<2<',
-        ...range('a', 'z')
+    ]);
+
+test('isTrue Missing Condition Error', function (string $expression) {
+    (new Math())->isTrue($expression);
+})->throws(ValueError::class, 'Condition expression is missing')
+    ->with([
+        'exclamation' => '1!',
+        ...range('A', 'z'),
+        ...array_map('strval', range('0', '9')),
     ]);
